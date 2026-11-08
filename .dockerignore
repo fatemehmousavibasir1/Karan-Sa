@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+settings.env
+krs.db
+*.log
+qa_results/
+*.xlsx
+_*.py
+.git/
+.cursor/
+dist/
