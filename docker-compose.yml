@@ -18,27 +18,9 @@ services:
       DB_PATH: /app/data/krs.db
       INVOICES_EXCEL: /app/data/invoices.xlsx
     ports:
-      - "7860:7860"
-    volumes:
-      - krs_data:/app/data
-
-  api:
-    image: krs-chatbot:latest
-    restart: unless-stopped
-    depends_on:
-      - app
-    env_file:
-      - .env
-    environment:
-      QDRANT_URL: http://qdrant:6333
-      DB_PATH: /app/data/krs.db
-      INVOICES_EXCEL: /app/data/invoices.xlsx
-    command: ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
-    ports:
       - "8000:8000"
     volumes:
       - krs_data:/app/data
-    profiles: ["api"]
 
 volumes:
   qdrant_storage:

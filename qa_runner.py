@@ -24,8 +24,9 @@ from config import BASE_DIR
 QA_XLSX = BASE_DIR / "KRS_Chatbot_QA_Dynamic_50Q.xlsx"
 OUT_DIR = BASE_DIR / "qa_results"
 SHOTS = OUT_DIR / "screenshots"
-UI_URL = "http://127.0.0.1:7860"
-PENDING = "⏳"
+UI_URL = "http://127.0.0.1:8000/#chat"
+# Let the chat grow to its full height so one element screenshot captures the whole Q&A.
+SHOT_CSS = ".view-chat { height: auto !important; } .chat-body { overflow: visible !important; }"
 
 REGISTER_MESSAGES = [
     "یک فاکتور جدید ثبت کن: شناسه 1010، شماره KRS-1405-810، تاریخ صدور 2026-11-08، سررسید 2026-11-08، "
@@ -68,42 +69,23 @@ def _save(phase: str, data: dict) -> None:
     _results_path(phase).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _bot_messages(page) -> list[str]:
-    return page.eval_on_selector_all(
-        "#chatbot .bot, #chatbot [data-testid='bot']",
-        "els => els.map(e => e.innerText)",
-    )
-
-
 def ask_ui(page, text: str, shot: Path, timeout: float = 240) -> str:
-    page.click("#clear")
-    page.wait_for_timeout(700)
-    box = page.locator("#msg textarea")
+    page.click("#clear-chat")
+    page.wait_for_timeout(500)
+    box = page.locator("#chat-input")
     box.fill(text)
     box.press("Enter")
-    start = time.time()
     answer = ""
-    while time.time() - start < timeout:
-        page.wait_for_timeout(1000)
-        msgs = [m for m in _bot_messages(page) if m.strip()]
-        if msgs and PENDING not in msgs[-1]:
-            answer = msgs[-1].strip()
-            break
-    page.wait_for_timeout(800)
-    box = page.locator("#chatbot").bounding_box()
-    bottom = page.evaluate(
-        """() => {
-            const els = document.querySelectorAll('#chatbot .bot, #chatbot [data-testid="bot"]');
-            if (!els.length) return null;
-            const r = els[els.length - 1].getBoundingClientRect();
-            return r.bottom + window.scrollY;
-        }"""
-    )
-    height = box["height"] if bottom is None else min(box["height"], bottom - box["y"] + 50)
-    page.screenshot(
-        path=str(shot),
-        clip={"x": box["x"], "y": box["y"], "width": box["width"], "height": max(height, 200)},
-    )
+    try:
+        page.wait_for_function(
+            "() => document.querySelector('.msg-bot') && !document.querySelector('.msg-bot .typing')",
+            timeout=timeout * 1000,
+        )
+        answer = page.locator(".msg-bot .bubble").last.inner_text().strip()
+    except Exception:  # noqa: BLE001
+        pass
+    page.wait_for_timeout(1200)
+    page.locator("#chat-body").screenshot(path=str(shot))
     return answer or "(پاسخی در زمان مقرر دریافت نشد)"
 
 
@@ -115,9 +97,10 @@ def _browser():
         browser = pw.chromium.launch(channel="msedge")
     except Exception:  # noqa: BLE001
         browser = pw.chromium.launch()
-    page = browser.new_page(viewport={"width": 1400, "height": 1900}, device_scale_factor=1)
+    page = browser.new_page(viewport={"width": 1400, "height": 900}, device_scale_factor=1)
     page.goto(UI_URL)
-    page.wait_for_selector("#msg textarea", timeout=60000)
+    page.wait_for_selector("#chat-input", timeout=60000)
+    page.add_style_tag(content=SHOT_CSS)
     return pw, browser, page
 
 

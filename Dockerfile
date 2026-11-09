@@ -4,10 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
     PIP_NO_CACHE_DIR=1 \
-    FASTEMBED_CACHE_PATH=/app/models \
-    GRADIO_SERVER_NAME=0.0.0.0 \
-    GRADIO_SERVER_PORT=7860 \
-    GRADIO_ANALYTICS_ENABLED=False
+    FASTEMBED_CACHE_PATH=/app/models
 
 WORKDIR /app
 
@@ -24,10 +21,11 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='${
 
 COPY *.py ./
 COPY Dataset.txt krs_chunks.txt ./
+COPY web ./web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /app/data
 
-EXPOSE 7860 8000
+EXPOSE 8000
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["python", "app.py"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

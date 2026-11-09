@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-KRS invoice chatbot backend API (no UI).
+KRS invoice chatbot backend API + web frontend (served at /).
 
 Run:
   .venv\\Scripts\\uvicorn api:app --host 0.0.0.0 --port 8000
@@ -11,14 +11,20 @@ Docs:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import web_data
 from db import invoices_frame, items_frame
 from pipeline import run_pipeline
+
+WEB_DIR = Path(__file__).resolve().parent / "web"
 
 Intent = Literal["view_data", "modify_data", "document_question", "hybrid", "greeting"]
 
@@ -70,6 +76,42 @@ def list_invoices() -> dict[str, Any]:
     }
 
 
+@app.get("/api/meta", tags=["web"])
+def meta() -> dict[str, Any]:
+    return {"columns": web_data.COLUMN_TITLES_FA, "status_labels": web_data.STATUS_FA}
+
+
+@app.get("/api/dashboard", tags=["web"])
+def dashboard() -> dict[str, Any]:
+    return web_data.dashboard()
+
+
+@app.get("/api/web/invoices", tags=["web"])
+def web_invoices() -> dict[str, Any]:
+    return web_data.invoices()
+
+
+@app.get("/api/web/invoices/{invoice_id}", tags=["web"])
+def web_invoice_detail(invoice_id: int) -> dict[str, Any]:
+    detail = web_data.invoice_detail(invoice_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="فاکتور پیدا نشد")
+    return detail
+
+
+@app.get("/api/tables", tags=["web"])
+def tables() -> list[dict[str, Any]]:
+    return web_data.tables_meta()
+
+
+@app.get("/api/tables/{name}", tags=["web"])
+def table(name: str) -> dict[str, Any]:
+    try:
+        return web_data.table_data(name)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="جدول نامعتبر") from None
+
+
 @app.post("/api/chat", response_model=ChatResponse, tags=["chat"])
 def chat_endpoint(body: ChatRequest) -> ChatResponse:
     text = body.message.strip()
@@ -101,6 +143,14 @@ def _warmup() -> None:
         warmup()
     except Exception as exc:  # noqa: BLE001
         print(f"warmup skipped: {exc}")
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    return FileResponse(WEB_DIR / "index.html")
+
+
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 
 if __name__ == "__main__":

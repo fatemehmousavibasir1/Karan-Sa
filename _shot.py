@@ -1,0 +1,20 @@
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    b = p.chromium.launch(channel="msedge")
+    page = b.new_page(viewport={"width": 1440, "height": 900})
+    page.goto("http://127.0.0.1:8000/#chat")
+    page.wait_for_timeout(1500)
+    page.click("#clear-chat")
+    page.fill("#chat-input", "فاکتورهای چک در جریان را با مبلغ خالص نشان بده")
+    page.keyboard.press("Enter")
+    page.wait_for_selector(".msg-bot .msg-meta", timeout=180000)
+    page.wait_for_timeout(800)
+    page.screenshot(path="qa_results/ui_chat_answer.png")
+    page.goto("http://127.0.0.1:8000/#invoices")
+    page.wait_for_timeout(1500)
+    page.click("#inv-table tbody tr")
+    page.wait_for_timeout(1500)
+    page.screenshot(path="qa_results/ui_drawer.png")
+    b.close()
+print("ok")
